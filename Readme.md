@@ -32,6 +32,7 @@ A compact, modular **ESP32-S3 based edge computing platform** designed for long-
 | Regulator  | LM1117-3.3                                       |
 
 ---
+<img width="4960" height="3507" alt="image" src="https://github.com/user-attachments/assets/aa941d01-ba74-4703-9655-cd65039f2415" />
 
 ## Repository Structure
 
@@ -44,6 +45,7 @@ A compact, modular **ESP32-S3 based edge computing platform** designed for long-
 ├── Firmware/
 ├── BOM/
 ├── README.md
+├── Future_Plan.md
 └── architecture.md
 ```
 
