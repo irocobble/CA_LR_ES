@@ -1,403 +1,261 @@
 # System Architecture
 
-## Overview
+## Introduction
 
-The **ESP32-S3 LoRa + GPS Module** is designed as a **daughterboard (System-on-Module)** rather than a standalone development board. The primary objective is to provide a reusable communication module that can be directly soldered onto a custom motherboard through castellated pads or board-to-board headers. This architecture allows hardware designers to integrate Wi-Fi, Bluetooth, LoRa, GPS, and edge computing capabilities into larger embedded systems without redesigning the RF or high-speed circuitry.
+OpenEdge-S3 is a modular **System-on-Module (SoM)** designed to simplify the development of long-range IoT and edge computing systems.
 
-The motherboard is responsible for application-specific hardware such as sensors, displays, power management, batteries, motor drivers, or industrial interfaces, while the daughterboard provides communication, storage, positioning, and processing.
+Rather than functioning as a traditional development board, OpenEdge-S3 is intended to be directly integrated onto a custom motherboard using **castellated edges** or a **board-to-board connector**. The module encapsulates the complex portions of hardware design—including wireless communication, GNSS positioning, onboard storage, USB connectivity, and firmware support—allowing developers to focus on application-specific hardware.
 
----
+By combining processing, positioning, storage, and communication into a single reusable module, OpenEdge-S3 reduces hardware development time while providing a scalable platform suitable for both prototyping and production deployments.
 
-# Design Philosophy
-
-The module is designed around four major principles:
-
-- Modular
-- Easy to Integrate
-- Developer Friendly
-- Production Ready
-
-Instead of exposing only power and UART, the board exposes multiple GPIOs and communication buses, allowing the host motherboard to utilize almost every peripheral of the ESP32-S3.
+The architecture is designed to support a wide range of applications, including industrial automation, environmental monitoring, smart agriculture, asset tracking, remote telemetry, and distributed edge computing.
 
 ---
 
-# High-Level Architecture
+## Design Goals
 
+The architecture of OpenEdge-S3 is guided by the following principles.
+
+### Modular Integration
+
+The module is designed as a reusable hardware building block that integrates directly onto a custom motherboard. By encapsulating the RF, GNSS, storage, and processing subsystems into a single module, developers can rapidly build products without redesigning complex circuitry for every project.
+
+### Production Ready
+
+The hardware is developed with manufacturing and long-term deployment in mind. Standardized interfaces, compact integration, and simplified motherboard requirements make the module suitable for both prototyping and commercial products.
+
+### Long-Range Connectivity
+
+OpenEdge-S3 provides reliable long-range wireless communication through LoRa while simultaneously supporting Wi-Fi and Bluetooth for local networking, device provisioning, diagnostics, and firmware updates.
+
+### Edge Computing
+
+Instead of acting solely as a communication device, the module performs local data processing, filtering, aggregation, and storage. Processing data at the edge reduces network traffic, improves response time, and enables autonomous operation in remote environments.
+
+### Hardware Expansion
+
+The module exposes standardized communication interfaces and GPIOs, allowing the host motherboard to extend functionality with additional peripherals while maintaining firmware compatibility across future hardware revisions.
+
+### Open Development
+
+The software ecosystem is designed to support both **ESP-IDF** and **Arduino IDE**, enabling professional firmware development alongside rapid prototyping and educational use.
+
+---
+
+## System Overview
+
+OpenEdge-S3 combines multiple hardware subsystems into a compact System-on-Module that serves as the communication and processing core of an embedded system.
+
+Rather than integrating sensors, displays, power electronics, or application-specific hardware directly onto the module, OpenEdge-S3 provides the common infrastructure required by connected embedded devices. This modular approach allows a single communication platform to be reused across multiple products while reducing development time and simplifying hardware design.
+
+The module is organized into five primary functional subsystems:
+
+- **Processing** – ESP32-S3 application processor responsible for system control, edge computing, and peripheral management.
+- **Wireless Communication** – LoRa for long-range communication together with Wi-Fi and Bluetooth for local connectivity.
+- **Positioning** – Multi-constellation GNSS receiver providing accurate location and timing information.
+- **Storage** – External QSPI Flash and MicroSD support for firmware, data logging, and offline operation.
+- **Expansion Interface** – Standardized hardware interface allowing the host motherboard to access communication buses, GPIOs, and future expansion capabilities.
+
+The host motherboard contains the application-specific electronics such as sensors, displays, industrial interfaces, actuators, battery management, or custom circuitry, while OpenEdge-S3 provides a reusable computing and communication platform.
+
+This separation enables multiple products to share the same firmware ecosystem and communication architecture while requiring only application-specific motherboard designs.
+
+---
+
+## High-Level System Architecture
+
+```text
+                     +--------------------------------------+
+                     |          Host Motherboard            |
+                     |--------------------------------------|
+                     | Sensors                              |
+                     | Displays                             |
+                     | Industrial Interfaces                |
+                     | Motor Drivers                        |
+                     | Battery Management                   |
+                     | Application Hardware                 |
+                     +------------------+-------------------+
+                                        │
+                           OpenEdge Expansion Interface
+                                        │
+        ==========================================================
+        ||                OpenEdge-S3 System-on-Module          ||
+        ==========================================================
+                                        │
+        -----------------------------------------------------------
+        │               │               │              │
+        │               │               │              │
+   ESP32-S3         LoRa Radio      GNSS Receiver   Storage
+        │               │               │              │
+ Wi-Fi / BLE        Long Range       Positioning   Flash + SD
+        │
+ GPIO • SPI • I²C • UART • USB • PWM • ADC
 ```
-                    +--------------------------------+
-                    |        Host Motherboard        |
-                    |--------------------------------|
-                    | Sensors                        |
-                    | Displays                       |
-                    | Relays                         |
-                    | Industrial Interfaces          |
-                    | Battery Management             |
-                    | Application Hardware           |
-                    +---------------+----------------+
-                                    |
-                          Expansion Connector
-                                    |
-                ====================================
-                ||     ESP32-S3 Daughter Board     ||
-                ====================================
-                                    |
-      ----------------------------------------------------------
-      |            |             |            |                 |
-      |            |             |            |                 |
-   ESP32-S3      LoRa         GPS         Storage         USB-C
-      |            |             |            |                 |
- WiFi/BLE      SX1262      MAX-M10S     Flash + SD       Programming
-      |
- GPIO / SPI / UART / I2C / I2S / ADC / PWM
-```
+---
+
+# Hardware Architecture
+
+OpenEdge-S3 is designed around a modular hardware architecture where each subsystem performs a dedicated function while remaining tightly integrated through the ESP32-S3.
+
+Instead of exposing a bare microcontroller, the module combines wireless communication, positioning, storage, power management, and peripheral interfaces into a single reusable System-on-Module. This significantly reduces motherboard complexity while maintaining flexibility for application-specific designs.
+
+The hardware architecture consists of the following functional blocks:
+
+- Processing Subsystem
+- Wireless Communication Subsystem
+- Positioning Subsystem
+- Storage Subsystem
+- USB Interface
+- Power Management
+- Expansion Interface
+
+Each subsystem is described below.
 
 ---
 
-# Functional Blocks
+## Processing Subsystem
 
-## 1. ESP32-S3
+The ESP32-S3 serves as the primary application processor and system controller.
 
-The ESP32-S3 serves as the central processing unit for the module.
+It is responsible for coordinating all onboard peripherals while simultaneously providing wireless networking and sufficient processing power for edge computing applications.
 
-Responsibilities include:
+### Responsibilities
 
-- Communication Management
-- Peripheral Control
-- Data Processing
-- Edge Computing
-- Wireless Connectivity
-- Host Interface
+- Application execution
+- Peripheral management
+- Communication scheduling
+- Local data processing
+- Sensor fusion
+- Wireless networking
+- Storage management
+- Power management
 
-Features utilized include:
+### Available Peripherals
 
 - Wi-Fi
-- Bluetooth LE
-- SPI
-- I2C
-- UART
-- GPIO
+- Bluetooth Low Energy (BLE)
 - USB
+- SPI
+- I²C
+- UART
+- PWM
+- ADC
 - DMA
-- Interrupts
+- GPIO
+- Interrupt Controller
+
+The ESP32-S3 also provides sufficient computational capability to perform local analytics before transmitting information over the LoRa network.
 
 ---
 
-## 2. LoRa Communication
+## Wireless Communication Subsystem
 
-The LoRa subsystem provides long-range wireless communication.
+Long-range communication is provided through the LoRa transceiver connected via SPI.
 
-Current implementation:
+The communication subsystem is designed to operate independently of the application hardware, allowing developers to reuse the same wireless platform across multiple products.
 
-- SX1262 Transceiver
+### Current Hardware
 
-Future implementation:
+- SX1262 LoRa Transceiver
 
-- Pre-certified LoRa Module
+### Planned Hardware
 
-Responsibilities:
+Future revisions will migrate to a pre-certified LoRa module to simplify RF design, improve compliance, and reduce PCB complexity.
+
+### Responsibilities
 
 - Packet Transmission
 - Packet Reception
-- Channel Monitoring
 - RSSI Measurement
+- Link Quality Monitoring
+- Channel Activity Detection
 - Network Communication
+
+The communication layer is intentionally isolated from the application layer, allowing future firmware libraries to support custom protocols without requiring hardware modifications.
 
 ---
 
-## 3. GPS
+## Positioning Subsystem
 
-The GPS subsystem provides:
+Positioning is provided through the onboard u-blox MAX-M10S multi-constellation GNSS receiver.
+
+Besides geographical positioning, GNSS also provides an accurate UTC time reference that can be used for timestamping, synchronization, and scheduled communication.
+
+### Available Data
 
 - Latitude
 - Longitude
-- UTC Time
-- Speed
 - Altitude
+- UTC Time
+- Ground Speed
 - Satellite Information
+- Fix Status
 
-The GPS communicates with the ESP32-S3 through UART.
+Communication with the ESP32-S3 is performed through a dedicated UART interface.
 
 ---
 
-## 4. Storage
+## Storage Subsystem
 
-Two storage options are available.
+OpenEdge-S3 provides both high-speed onboard storage and removable storage for flexible data management.
 
-### External Flash
+### External QSPI Flash
 
-Used for
+The onboard flash memory is intended for persistent system storage.
+
+Typical applications include:
 
 - Firmware Assets
-- Configuration
-- OTA Storage
-- Data Cache
+- Configuration Files
+- OTA Firmware Images
+- Persistent Data
+- Edge Computing Cache
 
-### MicroSD
+### MicroSD Storage
 
-Used for
+The MicroSD interface provides removable mass storage for large datasets.
 
-- Logging
-- Sensor Data
-- GPS Tracks
-- Offline Storage
+Typical applications include:
+
+- Sensor Logging
+- GPS Track Recording
+- Environmental Data
+- Offline Operation
+- Diagnostic Logs
+
+Combining both storage options enables the module to continue operating even when network connectivity is unavailable.
 
 ---
 
-## 5. USB Interface
+## USB Interface
 
-USB-C provides
+USB Type-C provides a modern interface for development, firmware updates, debugging, and power delivery.
 
-- Programming
-- Debugging
-- Power Input
+Integrated ESD protection improves system robustness during development and field deployment.
+
+### Functions
+
+- Firmware Programming
 - USB Serial Communication
+- Device Debugging
+- Power Input
 
-ESD protection is included for improved robustness.
-
----
-
-## 6. Power System
-
-The board accepts 5V input from USB.
-
-Power is regulated using a 3.3V LDO supplying:
-
-- ESP32-S3
-- LoRa
-- GPS
-- Flash
-- SD Card
-
-Multiple decoupling capacitors improve power integrity.
+Future firmware revisions may also expose additional USB device classes depending on application requirements.
 
 ---
 
-# Motherboard Interface
+## Power Management
 
-The daughterboard exposes all required signals to the host motherboard.
+The module is powered from a 5 V input supplied either by USB Type-C or the host motherboard.
 
-## Power
+An onboard 3.3 V regulator powers all digital subsystems including the ESP32-S3, LoRa transceiver, GNSS receiver, flash memory, and supporting peripherals.
 
-- VIN
-- 3V3
-- GND
+The power architecture incorporates dedicated decoupling capacitors positioned near each subsystem to improve supply stability and reduce high-frequency noise.
 
-## Communication
+Future hardware revisions are expected to introduce:
 
-- UART
-- SPI
-- I2C
-
-## GPIO
-
-Multiple GPIO pins are exposed for application-specific peripherals.
-
-Possible peripherals include:
-
-- Sensors
-- Displays
-- CAN Controllers
-- Ethernet Controllers
-- RS485
-- Relays
-- ADCs
-- DACs
-
----
-
-# Software Architecture
-
-```
-+----------------------------------------+
-|         User Application               |
-+----------------------------------------+
-
-                |
-
-+----------------------------------------+
-|     Application Libraries              |
-+----------------------------------------+
-
-                |
-
-+----------------------------------------+
-|     Communication Libraries            |
-|----------------------------------------|
-| LoRa                                   |
-| GPS                                    |
-| Storage                                |
-| USB                                    |
-+----------------------------------------+
-
-                |
-
-+----------------------------------------+
-| ESP-IDF / Arduino HAL                  |
-+----------------------------------------+
-
-                |
-
-+----------------------------------------+
-| Hardware Drivers                       |
-+----------------------------------------+
-
-                |
-
-+----------------------------------------+
-| ESP32-S3 Hardware                      |
-+----------------------------------------+
-```
-
----
-
-# Software Support
-
-The module is planned to support two software ecosystems.
-
-## ESP-IDF
-
-Target users:
-
-- Professional Development
-- RTOS Applications
-- Production Firmware
-
-Features:
-
-- Native ESP-IDF Components
-- FreeRTOS
-- OTA
-- NVS
-- Event-driven Drivers
-- Power Management
-
----
-
-## Arduino IDE
-
-Target users:
-
-- Rapid Prototyping
-- Education
-- Hobby Projects
-
-Features:
-
-- Simple APIs
-- Plug-and-play Libraries
-- Arduino Examples
-- Beginner Friendly
-
----
-
-# Planned Library Structure
-
-```
-libraries/
-
-├── LoRa/
-│   ├── begin()
-│   ├── send()
-│   ├── receive()
-│   ├── sleep()
-│   └── callbacks()
-│
-├── GPS/
-│   ├── begin()
-│   ├── location()
-│   ├── satellites()
-│   ├── speed()
-│   ├── altitude()
-│   └── time()
-│
-├── Storage/
-│   ├── Flash
-│   ├── SD
-│   └── FileSystem
-│
-├── System/
-│   ├── LEDs
-│   ├── Power
-│   ├── Diagnostics
-│   └── Version
-│
-└── Examples/
-```
-
----
-
-# Firmware Layers
-
-```
-Application
-      │
-      ▼
-High-Level APIs
-      │
-      ▼
-Device Libraries
-      │
-      ▼
-HAL
-      │
-      ▼
-ESP-IDF / Arduino Core
-      │
-      ▼
-Hardware
-```
-
----
-
-# Expansion Philosophy
-
-The module is intended to become a reusable building block.
-
-Future motherboard designs should only need to provide:
-
-- Power
-- Mechanical Support
-- Application Hardware
-
-The communication stack, GPS functionality, storage management, and wireless connectivity remain entirely encapsulated within the daughterboard.
-
----
-
-# Future Roadmap
-
-## Hardware
-
-- [ ] Replace SX1262 IC with a certified LoRa module
-- [ ] Castellated edge design for SMT mounting
-- [ ] Improved RF matching network
-- [ ] Optional U.FL/IPEX antenna connectors
-- [ ] Battery charging circuitry
-- [ ] RTC backup battery support
-- [ ] Low-power optimization
-- [ ] SWD/JTAG debug header
-
----
-
-## Software
-
-### ESP-IDF
-
-- [ ] Driver framework
-- [ ] Component Manager support
-- [ ] OTA examples
-- [ ] Power management
-- [ ] Example applications
-
-### Arduino
-
-- [ ] Arduino Library
-- [ ] Board Package
-- [ ] Example sketches
-- [ ] Documentation
-- [ ] PlatformIO support
-
----
-
-# Long-Term Vision
-
-The long-term goal of this project is to provide a compact, production-ready communication module that can be integrated into a wide range of embedded systems with minimal effort. By abstracting the complexity of wireless communication, GNSS positioning, storage, and firmware development into a single reusable daughterboard, developers can focus on building application-specific motherboards and software. Support for both ESP-IDF and Arduino IDE will ensure the module is accessible to hobbyists, researchers, and commercial product developers alike while maintaining a common hardware platform across projects.
+- Battery Charging
+- Battery Monitoring
+- RTC Backup Supply
+- Low-Power Operating Modes
+- Power Path Management
