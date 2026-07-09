@@ -10,10 +10,7 @@
 		(hide yes)
 		(uuid "2a9ded67-f36c-4c13-8f18-192f6a099af7")
 		(effects
-			(font
-				(size 1 1)
-				(thickness 0.1)
-			)
+			(font (size 1 1) (thickness 0.1))
 		)
 	)
 	(property "Value" "Castellated_Edge_10P_2.54mm"
@@ -23,10 +20,7 @@
 		(hide yes)
 		(uuid "a20d5e76-2606-4d4a-b154-d1e51f9b8a06")
 		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
+			(font (size 1 1) (thickness 0.15))
 		)
 	)
 	(property "Datasheet" ""
@@ -36,10 +30,7 @@
 		(hide yes)
 		(uuid "f1d2eea7-57ae-4da5-addd-37061f950745")
 		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
+			(font (size 1 1) (thickness 0.15))
 		)
 	)
 	(property "Description" ""
@@ -49,20 +40,14 @@
 		(hide yes)
 		(uuid "305bd201-59f3-4906-b089-863ab83fed7c")
 		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
+			(font (size 1 1) (thickness 0.15))
 		)
 	)
 	(attr smd)
 	(fp_rect
 		(start -12.5 -7.5)
 		(end 12.5 7.5)
-		(stroke
-			(width 0.05)
-			(type default)
-		)
+		(stroke (width 0.05) (type default))
 		(fill no)
 		(layer "Edge.Cuts")
 		(uuid "7c092f0a-1987-4816-98c9-320f8c81c277")
@@ -73,10 +58,7 @@
 		(layer "Edge.Cuts")
 		(uuid "ee4b04ff-eb15-4a1a-9ba5-1e2acb86e1a5")
 		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
+			(font (size 1 1) (thickness 0.15))
 			(justify left bottom)
 		)
 	)
