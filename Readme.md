@@ -18,14 +18,14 @@ The platform is built in four development stages, moving from hardware bring-up 
 **Board 1** and **Board 2** are not independent nodes — Board 1 is soldered directly onto Board 2 as a stacked daughterboard, connected via a 21-pin castellated edge interface. Board 2 provides sensing (mic array) and RF (LoRa), while Board 1 provides compute (S3), GNSS, and status indication. The ESP32-S3 owns all preprocessing, Doppler DoA computation, classification, and LoRa communication; the ESP32-C3 exists solely to manage ADC conversion of the 4-mic array.
 
 ```
-┌─────────────────────────────┐
+┌──────────────────────────────┐
 │   Board 1 (4-layer, top)     │
 │   ESP32-S3 · GPS · LEDs      │
 │   → preprocessing, DoA,      │
 │     classification, LoRa TX  │
 └──────────────┬───────────────┘
                │ 21-pin castellated edge
-┌──────────────┴───────────────┐
+┌──────────────┴────────────────┐
 │   Board 2 (2-layer, bottom)   │
 │   ESP32-C3 · 4x Mic Array ·   │
 │   SX1262 LoRa                 │
@@ -42,7 +42,6 @@ The platform is built in four development stages, moving from hardware bring-up 
 * LED status indicators (ESP, LoRa TX/RX, GPS, power)
 * 128 Mbit external QSPI flash
 * External Quad PSRAM
-* MicroSD card support
 * USB Type-C power & programming
 * 3.3V regulated power supply
 * USB ESD protection
@@ -51,12 +50,17 @@ The platform is built in four development stages, moving from hardware bring-up 
 
 * ESP32-C3 — dedicated to ADC conversion of the mic array only, no onboard DSP
 * 4x microphone array (analog front end)
+* MicroSD card support
+* USB Type-C power & programming
+* USB HUB For S3 and C3 Programming
+* Battery Support
 * SX1262 LoRa transceiver (RF section on this board; driven over SPI by the S3 on Board 1)
 * Cost-reduced 2-layer stackup
 
-## Stage 3 — Doppler DoA Library
+## Stage 3 — Doppler DoA Library & 3D printing the case
 
-Firmware library consuming the 4-mic array stream to estimate sound source direction using Doppler-effect analysis (inter-mic timing/frequency shift). Runs on the ESP32-S3.
+*Firmware library consuming the 4-mic array stream to estimate sound source direction using Doppler-effect analysis (inter-mic timing/frequency shift). Runs on the ESP32-S3.
+*To develop a Custom case for enclosing the PCB
 
 ## Stage 4 — Onboard Classification
 
@@ -124,9 +128,6 @@ Board 1 and Board 2 connect through a 21-pin castellated edge, grouped into thre
 
 ```text
 .
-├── Schematic/
-│   ├── Board1_4Layer/
-│   └── Board2_2Layer/
 ├── PCB/
 │   ├── Board1_4Layer/
 │   └── Board2_2Layer/
