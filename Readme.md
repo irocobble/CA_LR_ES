@@ -1,3 +1,7 @@
+#Team Members
+1] Aninda Majumdar(Git-https://github.com/irocobble)
+2] Subham Basak(Git-)
+3] Kartik Kajra(Git-)
 # Acoustic Doppler Sensing Edge Node
 
 A **staged, stackable edge computing platform** for long-range acoustic sensing and localization. The system splits compute, RF, and sensing across two interconnected boards, moving from a single monolithic node toward a modular, cost-optimized architecture with onboard sound-source localization and classification.
