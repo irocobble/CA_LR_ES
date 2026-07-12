@@ -2,260 +2,227 @@
 
 ## Introduction
 
-OpenEdge-S3 is a modular **System-on-Module (SoM)** designed to simplify the development of long-range IoT and edge computing systems.
+The **Acoustic Doppler Sensing Edge Node** is a modular, stacked embedded platform designed for long-range acoustic sensing, sound-source localization, and onboard classification.
 
-Rather than functioning as a traditional development board, OpenEdge-S3 is intended to be directly integrated onto a custom motherboard using **castellated edges** or a **board-to-board connector**. The module encapsulates the complex portions of hardware design—including wireless communication, GNSS positioning, onboard storage, USB connectivity, and firmware support—allowing developers to focus on application-specific hardware.
+Rather than existing as a single monolithic board, the system is split across two physically stacked PCBs connected by a 21-pin castellated edge interface: a **4-layer compute board** carrying the ESP32-S3 and GNSS, and a **2-layer sensing/RF board** carrying the ESP32-C3, a 4-microphone array, and the LoRa radio. This split isolates the expensive 4-layer stackup to only the subsystem that needs it (the S3 and its high-speed peripherals), while the sensing and RF hardware live on a cheaper 2-layer board.
 
-By combining processing, positioning, storage, and communication into a single reusable module, OpenEdge-S3 reduces hardware development time while providing a scalable platform suitable for both prototyping and production deployments.
-
-The architecture is designed to support a wide range of applications, including industrial automation, environmental monitoring, smart agriculture, asset tracking, remote telemetry, and distributed edge computing.
+The architecture is designed to support acoustic monitoring applications where a node must detect a sound event, estimate its direction of arrival, classify it, and report it over a long-range link — autonomously and in the field.
 
 ---
 
 ## Design Goals
 
-The architecture of OpenEdge-S3 is guided by the following principles.
+### Staged Development
 
-### Modular Integration
+The system is built incrementally across four stages — compute/GNSS hardware, sensing/RF hardware, a Doppler-based direction-of-arrival (DoA) library, and an onboard classifier — so that hardware bring-up and algorithm development can proceed in parallel without blocking each other.
 
-The module is designed as a reusable hardware building block that integrates directly onto a custom motherboard. By encapsulating the RF, GNSS, storage, and processing subsystems into a single module, developers can rapidly build products without redesigning complex circuitry for every project.
+### Cost-Optimized Stacking
 
-### Production Ready
+By separating the S3's high-speed subsystem (which requires a 4-layer board for signal integrity) from the mic array and LoRa RF section (which can run on 2 layers), the overall bill of materials and fabrication cost is reduced without compromising the compute board's performance.
 
-The hardware is developed with manufacturing and long-term deployment in mind. Standardized interfaces, compact integration, and simplified motherboard requirements make the module suitable for both prototyping and commercial products.
+### Long-Range Reporting
 
-### Long-Range Connectivity
+The SX1262 LoRa radio, physically located on the sensing board, is driven directly by the ESP32-S3 across the castellated edge — giving the compute board full control of the radio while keeping the RF section physically close to the antenna and away from the S3's high-speed QSPI/PSRAM traces.
 
-OpenEdge-S3 provides reliable long-range wireless communication through LoRa while simultaneously supporting Wi-Fi and Bluetooth for local networking, device provisioning, diagnostics, and firmware updates.
+### Edge Intelligence
 
-### Edge Computing
+All acoustic preprocessing, Doppler DoA computation, and classification run locally on the ESP32-S3. The ESP32-C3 is intentionally kept "dumb" — its only job is sampling the 4-mic array and streaming raw data to the S3. This keeps the compute-heavy work on the board with the horsepower (S3 + PSRAM) and keeps the C3 board simple and cheap.
 
-Instead of acting solely as a communication device, the module performs local data processing, filtering, aggregation, and storage. Processing data at the edge reduces network traffic, improves response time, and enables autonomous operation in remote environments.
+### Field Deployability
 
-### Hardware Expansion
-
-The module exposes standardized communication interfaces and GPIOs, allowing the host motherboard to extend functionality with additional peripherals while maintaining firmware compatibility across future hardware revisions.
+GNSS positioning and timestamping, MicroSD logging, battery support, and a 3D-printed enclosure (Stage 3) are included so the node can operate autonomously and unattended in outdoor/remote environments.
 
 ### Open Development
 
-The software ecosystem is designed to support both **ESP-IDF** and **Arduino IDE**, enabling professional firmware development alongside rapid prototyping and educational use.
+Firmware for both the S3 and C3 targets ESP-IDF, keeping the two boards' firmware in the same build ecosystem despite running different roles.
 
 ---
 
 ## System Overview
 
-OpenEdge-S3 combines multiple hardware subsystems into a compact System-on-Module that serves as the communication and processing core of an embedded system.
+The platform is organized into two physical boards, each owning a distinct set of subsystems:
 
-Rather than integrating sensors, displays, power electronics, or application-specific hardware directly onto the module, OpenEdge-S3 provides the common infrastructure required by connected embedded devices. This modular approach allows a single communication platform to be reused across multiple products while reducing development time and simplifying hardware design.
+**Board 1 — Compute & GNSS (4-layer)**
+- ESP32-S3 application processor — preprocessing, Doppler DoA, classification, LoRa control
+- u-blox MAX-M10S GNSS receiver
+- LED status indicators
+- External QSPI flash + Quad PSRAM
+- USB Type-C (power & programming)
+- 3.3V regulation, USB ESD protection
 
-The module is organized into five primary functional subsystems:
+**Board 2 — Sensing & RF (2-layer)**
+- ESP32-C3 — dedicated mic ADC sampling only, no onboard DSP
+- 4x microphone array (analog front end)
+- SX1262 LoRa transceiver (RF hardware only; controlled by the S3 over the castellated edge)
+- MicroSD card storage
+- USB Type-C + USB hub (shared programming access for both S3 and C3)
+- Battery support
 
-- **Processing** – ESP32-S3 application processor responsible for system control, edge computing, and peripheral management.
-- **Wireless Communication** – LoRa for long-range communication together with Wi-Fi and Bluetooth for local connectivity.
-- **Positioning** – Multi-constellation GNSS receiver providing accurate location and timing information.
-- **Storage** – External QSPI Flash and MicroSD support for firmware, data logging, and offline operation.
-- **Expansion Interface** – Standardized hardware interface allowing the host motherboard to access communication buses, GPIOs, and future expansion capabilities.
-
-The host motherboard contains the application-specific electronics such as sensors, displays, industrial interfaces, actuators, battery management, or custom circuitry, while OpenEdge-S3 provides a reusable computing and communication platform.
-
-This separation enables multiple products to share the same firmware ecosystem and communication architecture while requiring only application-specific motherboard designs.
+The two boards communicate exclusively through the **21-pin castellated edge connector**, which carries mic data (QSPI), LoRa control (SPI + IRQ/reset), and shared power/GPIO.
 
 ---
 
 ## High-Level System Architecture
 
 ```text
-                     +--------------------------------------+
-                     |          Host Motherboard            |
-                     |--------------------------------------|
-                     | Sensors                              |
-                     | Displays                             |
-                     | Industrial Interfaces                |
-                     | Motor Drivers                        |
-                     | Battery Management                   |
-                     | Application Hardware                 |
-                     +------------------+-------------------+
-                                        │
-                           OpenEdge Expansion Interface
-                                        │
-        ==========================================================
-        ||                OpenEdge-S3 System-on-Module          ||
-        ==========================================================
-                                        │
-        -----------------------------------------------------------
-        │               │               │              │
-        │               │               │              │
-   ESP32-S3         LoRa Radio      GNSS Receiver   Storage
-        │               │               │              │
- Wi-Fi / BLE        Long Range       Positioning   Flash + SD
-        │
- GPIO • SPI • I²C • UART • USB • PWM • ADC
+                     +-----------------------------------------------+
+                     |          Board 1 — 4-Layer (Compute)          |
+                     |-----------------------------------------------|
+                     | ESP32-S3                                      |
+                     | u-blox MAX-M10S GNSS                          |
+                     | LED Indicators                                |
+                     | QSPI Flash + PSRAM                            |
+                     | USB Type-C (power/program)                    |
+                     |    → Preprocessing, Doppler DoA,              |
+                     |      Classification, LoRa Control             |
+                     +----------------------+------------------------+
+                                            │
+                              21-Pin Castellated Edge
+                       (J1: Power/Free · J2: QSPI · J3: LoRa)
+                                            │
+                     +----------------------+------------------------+
+                     |          Board 2 — 2-Layer (Sensing/RF)       |
+                     |-----------------------------------------------|
+                     | ESP32-C3 (mic ADC only)                       |
+                     | 4x Microphone Array                           |
+                     | SX1262 LoRa Transceiver                       |
+                     | MicroSD Storage                               |
+                     | USB Hub (S3 + C3 programming)                 |
+                     | Battery Support                               |
+                     +-----------------------------------------------+
 ```
+
 ---
 
 # Hardware Architecture
 
-OpenEdge-S3 is designed around a modular hardware architecture where each subsystem performs a dedicated function while remaining tightly integrated through the ESP32-S3.
-
-Instead of exposing a bare microcontroller, the module combines wireless communication, positioning, storage, power management, and peripheral interfaces into a single reusable System-on-Module. This significantly reduces motherboard complexity while maintaining flexibility for application-specific designs.
-
-The hardware architecture consists of the following functional blocks:
-
-- Processing Subsystem
-- Wireless Communication Subsystem
-- Positioning Subsystem
-- Storage Subsystem
-- USB Interface
-- Power Management
-- Expansion Interface
-
-Each subsystem is described below.
-
----
-
 ## Processing Subsystem
 
-The ESP32-S3 serves as the primary application processor and system controller.
+### ESP32-S3 (Board 1 — Primary Compute)
 
-It is responsible for coordinating all onboard peripherals while simultaneously providing wireless networking and sufficient processing power for edge computing applications.
+The ESP32-S3 is the system's central processor, responsible for all computation, decision-making, and communication.
 
-### Responsibilities
+**Responsibilities**
+- Reading mic-array data streamed from the ESP32-C3 over the castellated edge QSPI link
+- Running the Doppler DoA library (Stage 3) to estimate sound source direction
+- Running the onboard classifier (Stage 4) to flag human vs. non-human sound events
+- Driving the SX1262 LoRa radio (physically on Board 2) over SPI + IRQ/reset lines
+- Reading GNSS position/time from the MAX-M10S for event timestamping and geotagging
+- Managing external QSPI flash and PSRAM for buffering/model storage
+- Driving LED status indicators
 
-- Application execution
-- Peripheral management
-- Communication scheduling
-- Local data processing
-- Sensor fusion
-- Wireless networking
-- Storage management
-- Power management
+### ESP32-C3 (Board 2 — Mic ADC Front End)
 
-### Available Peripherals
+The ESP32-C3 performs one job only: sampling the 4-microphone array and streaming the digitized data to the ESP32-S3. It runs no DSP, DoA computation, or classification — all of that is deferred to the S3 to keep this board's firmware and hardware minimal.
 
-- Wi-Fi
-- Bluetooth Low Energy (BLE)
-- USB
-- SPI
-- I²C
-- UART
-- PWM
-- ADC
-- DMA
-- GPIO
-- Interrupt Controller
-
-The ESP32-S3 also provides sufficient computational capability to perform local analytics before transmitting information over the LoRa network.
+**Responsibilities**
+- ADC sampling of the 4-mic analog front end
+- Streaming sampled mic data to the S3 over the castellated-edge QSPI link
+- Basic housekeeping (e.g. USB hub arbitration for shared programming access)
 
 ---
 
 ## Wireless Communication Subsystem
 
-Long-range communication is provided through the LoRa transceiver connected via SPI.
+Long-range communication is provided by an SX1262 LoRa transceiver, physically located on Board 2 but fully controlled by the ESP32-S3 on Board 1 via the J3 bank of the castellated edge (SCK, MISO, MOSI, NSS, BUSY, DIO1, RESET).
 
-The communication subsystem is designed to operate independently of the application hardware, allowing developers to reuse the same wireless platform across multiple products.
-
-### Current Hardware
-
+**Current Hardware**
 - SX1262 LoRa Transceiver
 
-### Planned Hardware
+**Planned Hardware**
+- Migration to a pre-certified LoRa module to simplify RF design and improve regulatory compliance
 
-Future revisions will migrate to a pre-certified LoRa module to simplify RF design, improve compliance, and reduce PCB complexity.
+**Responsibilities**
+- Packet transmission of localization/classification results
+- RSSI / link quality monitoring
+- Channel activity detection
 
-### Responsibilities
+---
 
-- Packet Transmission
-- Packet Reception
-- RSSI Measurement
-- Link Quality Monitoring
-- Channel Activity Detection
-- Network Communication
+## Acoustic Sensing Subsystem
 
-The communication layer is intentionally isolated from the application layer, allowing future firmware libraries to support custom protocols without requiring hardware modifications.
+### Microphone Array (Board 2)
+
+Four analog microphones form a fixed-geometry array. Inter-mic timing and amplitude differences are the raw input to the Stage 3 Doppler DoA library.
+
+### Mic ADC Path (ESP32-C3)
+
+The C3 samples all 4 mic channels and streams the digitized data to the S3 over QSPI (J2 bank: GPIO35/34/37/36/33, plus GPIO21 as clock/strobe). No filtering or DSP is performed on the C3 — raw samples are passed upstream.
+
+### Doppler DoA Library (Stage 3, runs on S3)
+
+A firmware library that consumes the streamed 4-channel mic data and estimates the direction of a sound source using Doppler-effect analysis (inter-mic timing/frequency shift). This is the core sensing algorithm of the platform.
+
+### Classification (Stage 4, runs on S3)
+
+A lightweight human/non-human classifier consumes the DoA stage's output to flag and localize detections in real time, before results are queued for LoRa transmission.
 
 ---
 
 ## Positioning Subsystem
 
-Positioning is provided through the onboard u-blox MAX-M10S multi-constellation GNSS receiver.
+Positioning is provided by the onboard u-blox MAX-M10S GNSS receiver on Board 1, communicating with the ESP32-S3 over UART.
 
-Besides geographical positioning, GNSS also provides an accurate UTC time reference that can be used for timestamping, synchronization, and scheduled communication.
-
-### Available Data
-
-- Latitude
-- Longitude
-- Altitude
+**Available Data**
+- Latitude / Longitude / Altitude
 - UTC Time
 - Ground Speed
 - Satellite Information
 - Fix Status
 
-Communication with the ESP32-S3 is performed through a dedicated UART interface.
+GNSS time is used to timestamp detected acoustic events; position is used to geotag them before transmission over LoRa.
 
 ---
 
 ## Storage Subsystem
 
-OpenEdge-S3 provides both high-speed onboard storage and removable storage for flexible data management.
+**External QSPI Flash + PSRAM (Board 1)**
+Used for firmware assets, configuration, OTA images, and buffering during Doppler DoA / classification processing.
 
-### External QSPI Flash
-
-The onboard flash memory is intended for persistent system storage.
-
-Typical applications include:
-
-- Firmware Assets
-- Configuration Files
-- OTA Firmware Images
-- Persistent Data
-- Edge Computing Cache
-
-### MicroSD Storage
-
-The MicroSD interface provides removable mass storage for large datasets.
-
-Typical applications include:
-
-- Sensor Logging
-- GPS Track Recording
-- Environmental Data
-- Offline Operation
-- Diagnostic Logs
-
-Combining both storage options enables the module to continue operating even when network connectivity is unavailable.
+**MicroSD Storage (Board 2)**
+Used for logging raw or preprocessed acoustic events, GNSS tracks, and diagnostic data, enabling offline operation when LoRa connectivity is degraded or unavailable.
 
 ---
 
 ## USB Interface
 
-USB Type-C provides a modern interface for development, firmware updates, debugging, and power delivery.
+Both boards expose USB Type-C. Board 2 includes a USB hub so a single physical connection can be used to program/debug both the ESP32-S3 (Board 1) and ESP32-C3 (Board 2) once stacked, without requiring separate cabling to each board.
 
-Integrated ESD protection improves system robustness during development and field deployment.
-
-### Functions
-
-- Firmware Programming
-- USB Serial Communication
-- Device Debugging
-- Power Input
-
-Future firmware revisions may also expose additional USB device classes depending on application requirements.
+**Functions**
+- Firmware programming (S3 and C3)
+- USB serial communication / debugging
+- Power input
 
 ---
 
 ## Power Management
 
-The module is powered from a 5 V input supplied either by USB Type-C or the host motherboard.
+The stacked assembly is powered from 5V via USB Type-C (with battery support added on Board 2). An onboard 3.3V regulator supplies all digital subsystems across both boards — ESP32-S3, ESP32-C3, LoRa transceiver, GNSS receiver, flash, and mic front end — with power delivered across the castellated edge (J1 bank).
 
-An onboard 3.3 V regulator powers all digital subsystems including the ESP32-S3, LoRa transceiver, GNSS receiver, flash memory, and supporting peripherals.
+Decoupling capacitors are placed locally at each subsystem on both boards to maintain supply stability, particularly important given the mixed digital/RF/analog nature of the stack.
 
-The power architecture incorporates dedicated decoupling capacitors positioned near each subsystem to improve supply stability and reduce high-frequency noise.
+**Planned for future revisions**
+- Battery charging management
+- Battery level monitoring
+- RTC backup supply
+- Low-power / duty-cycled operating modes for extended field deployment
 
-Future hardware revisions are expected to introduce:
+---
 
-- Battery Charging
-- Battery Monitoring
-- RTC Backup Supply
-- Low-Power Operating Modes
-- Power Path Management
+## Board Interconnect — 21-Pin Castellated Edge
+
+The castellated edge is the sole electrical link between Board 1 and Board 2, organized into three logical 7-pin banks:
+
+**J1 — Power / Free**: +3V3, GND, and 4 general-purpose lines (GPIO2, GPIO3, GPIO10, GPIO38, GPIO15) reserved for future expansion or board-specific control signals.
+
+**J2 — QSPI (Mic Data)**: 5 data/strobe lines (GPIO35, GPIO34, GPIO37, GPIO36, GPIO33) plus GPIO21, carrying the streamed mic-array data from the C3 to the S3.
+
+**J3 — LoRa Control**: Full SX1262 control interface — SCK, MISO, MOSI, NSS (GPIO4), BUSY (GPIO9), DIO1 (IRQ), and RESET — allowing the S3 to fully drive the radio despite it being physically located on Board 2.
+
+This interconnect is the primary integration risk in the design and will require signal integrity validation (particularly for the QSPI mic link and LoRa SPI) once both boards are fabricated and stacked.
+
+---
+
+## Mechanical — Stage 3 Enclosure
+
+In parallel with the Doppler DoA firmware work, Stage 3 includes development of a custom 3D-printed enclosure for the stacked board assembly, intended to protect the mic array's acoustic ports and the GNSS/LoRa antennas while allowing sound to reach the microphones with minimal attenuation or reflection.
