@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 0)
+  (lib (name "Adafruit CH334F Mini 4-Port USB Hub Breakout-eagle-import")(type "KiCad")(uri "${KIPRJMOD}/Adafruit CH334F Mini 4-Port USB Hub Breakout-eagle-import.kicad_sym")(options "")(descr ""))
+)

@@ -1,0 +1,6 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "LORA")(type "KiCad")(uri "C:/Code/Capstone/Assets/footprints/LORA.pretty")(options "")(descr ""))
+  (lib (name "Mic")(type "KiCad")(uri "C:/Code/Capstone/Assets/footprints/Mic.pretty")(options "")(descr ""))
+  (lib (name "K210_module")(type "KiCad")(uri "C:/Code/Capstone/Assets/footprints/K210_module.pretty")(options "")(descr ""))
+)
