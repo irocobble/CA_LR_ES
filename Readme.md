@@ -180,7 +180,6 @@ bus carries only derived results — event class, confidence, and bearing.
 
 ### Firmware
 
-- [x] `gray8` spectrogram library — validated, portable across bare-metal and Linux targets
 - [ ] K210 I2S multi-channel capture (master, 3 data lines)
 - [ ] K210 APU beamforming / DoA bring-up
 - [ ] QSPI link — K210 master, ESP32-S3 SPI Slave HD
