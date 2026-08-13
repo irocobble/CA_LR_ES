@@ -1,130 +1,132 @@
-#Team Members
-1] Aninda Majumdar(Git-https://github.com/irocobble)
-2] Subham Basak(Git-)
-3] Kartik Kajra(Git-)
-# Acoustic Doppler Sensing Edge Node
+# Team Members
 
-A **staged, stackable edge computing platform** for long-range acoustic sensing and localization. The system splits compute, RF, and sensing across two interconnected boards, moving from a single monolithic node toward a modular, cost-optimized architecture with onboard sound-source localization and classification.
+1. Aninda Majumdar — https://github.com/irocobble
+2. Subham Basak
+3. Kartik Kajra
+
+---
+
+# Acoustic Sensing Node
+
+A **single-board, field-deployable acoustic sensor node** for search-and-rescue.
+The node is designed to be inserted into rubble or debris, listen for human
+distress signals (tapping, banging, shouting), estimate the **direction** the
+sound came from, and relay a GPS-tagged alert over LoRa to a rescue coordination
+dashboard.
+
+Everything the node needs — sensing, edge inference, positioning, radio and power
+— sits on one PCB. Search-and-rescue is a race against time, and the hardest part
+is knowing where to dig. Rather than sending people into unstable rubble to
+listen, this sends the ears in first.
 
 ---
 
 ## Architecture Overview
 
-The platform is built in four development stages, moving from hardware bring-up to onboard intelligence:
+A **single board** carrying two processors with a clean split of duties:
 
-| Stage | Description | Status |
-|---|---|---|
-| **1** | 4-layer board — ESP32-S3, GPS, LED indicators | In development |
-| **2** | 2-layer board — ESP32-C3, 4-mic array, SX1262 LoRa | In development |
-| **3** | Doppler-effect DSP library for sound source direction-of-arrival | Planned |
-| **4** | Onboard human/non-human sound classifier | Planned |
+| Processor | Role |
+|---|---|
+| **Kendryte K210** (Sipeed M1 module) | Acoustic capture and inference — mic array I2S master, beamforming, direction-of-arrival, classification |
+| **ESP32-S3** | System host — LoRa control, GNSS, IMU, USB, power sequencing, alert formatting |
 
-**Board 1** and **Board 2** are not independent nodes — Board 1 is soldered directly onto Board 2 as a stacked daughterboard, connected via a 21-pin castellated edge interface. Board 2 provides sensing (mic array) and RF (LoRa), while Board 1 provides compute (S3), GNSS, and status indication. The ESP32-S3 owns all preprocessing, Doppler DoA computation, classification, and LoRa communication; the ESP32-C3 exists solely to manage ADC conversion of the 4-mic array.
+The K210 was selected because its **APU (Audio Processing Unit) implements
+microphone-array processing in hardware** — sound source localization,
+beamforming, and voice activity detection, with a dedicated FFT accelerator. For
+a node buried in rubble, a *bearing* to the survivor is worth far more to a
+rescue team than a binary "sound detected" flag, and the K210 produces that
+without burning CPU cycles.
 
 ```
-┌──────────────────────────────┐
-│   Board 1 (4-layer, top)     │
-│   ESP32-S3 · GPS · LEDs      │
-│   → preprocessing, DoA,      │
-│     classification, LoRa TX  │
-└──────────────┬───────────────┘
-               │ 21-pin castellated edge
-┌──────────────┴────────────────┐
-│   Board 2 (2-layer, bottom)   │
-│   ESP32-C3 · 4x Mic Array ·   │
-│   SX1262 LoRa                 │
-│   → mic ADC sampling only     │
-└───────────────────────────────┘
+                    ┌─────────────────────────────────────────┐
+                    │        Acoustic Sensing Node            │
+                    ├─────────────────────────────────────────┤
+                    │                                         │
+  6x INMP441  ──I2S──▶  K210 / Sipeed M1                      │
+  mic array         │   · APU beamforming + DoA               │
+                    │   · event classification                │
+                    │            │                            │
+                    │          QSPI (6-wire)                  │
+                    │            ▼                            │
+                    │      ESP32-S3                           │
+                    │   · alert formatting + LoRa control     │
+                    │   · GNSS, IMU, USB, power               │
+                    │      │        │        │                │
+                    └──────┼────────┼────────┼────────────────┘
+                           │        │        │
+                        SX1262   MAX-M10S  MPU-9250
+                        (LoRa)    (GNSS)    (IMU)
+                           │        │
+                          J4       J1        ← U.FL / coax
 ```
 
----
-
-## Stage 1 — Compute & GNSS Board (4-layer)
-
-* ESP32-S3 dual-core MCU — runs preprocessing, Doppler localization, and classification
-* u-blox MAX-M10S GNSS receiver
-* LED status indicators (ESP, LoRa TX/RX, GPS, power)
-* 128 Mbit external QSPI flash
-* External Quad PSRAM
-* USB Type-C power & programming
-* 3.3V regulated power supply
-* USB ESD protection
-
-## Stage 2 — Sensing & RF Board (2-layer)
-
-* ESP32-C3 — dedicated to ADC conversion of the mic array only, no onboard DSP
-* 4x microphone array (analog front end)
-* MicroSD card support
-* USB Type-C power & programming
-* USB HUB For S3 and C3 Programming
-* Battery Support
-* SX1262 LoRa transceiver (RF section on this board; driven over SPI by the S3 on Board 1)
-* Cost-reduced 2-layer stackup
-
-## Stage 3 — Doppler DoA Library & 3D printing the case
-
-*Firmware library consuming the 4-mic array stream to estimate sound source direction using Doppler-effect analysis (inter-mic timing/frequency shift). Runs on the ESP32-S3.
-*To develop a Custom case for enclosing the PCB
-
-## Stage 4 — Onboard Classification
-
-Lightweight human vs. non-human sound classifier running on the S3, consuming the output of the Doppler DoA stage to flag and localize detections in real time.
-
----
-
-## Board Interconnect — 21-Pin Castellated Edge
-
-Board 1 and Board 2 connect through a 21-pin castellated edge, grouped into three 7-pin banks:
-
-**J1 — Power / Free**
-| Pin | Signal |
-|---|---|
-| 1 | +3V3 |
-| 2 | GPIO2 |
-| 3 | GPIO3 |
-| 4 | GPIO10 |
-| 5 | GPIO38 |
-| 6 | GPIO15 |
-| 7 | GND |
-
-**J2 — QSPI (Mic Data, C3 → S3)**
-| Pin | Signal |
-|---|---|
-| 1 | GPIO35 |
-| 2 | GPIO34 |
-| 3 | GPIO37 |
-| 4 | GPIO36 |
-| 5 | GPIO33 |
-| 6 | GPIO21 |
-| 7 | +3V3 / GND |
-
-**J3 — LoRa (SX1262 Control, S3 → Board 2)**
-| Pin | Signal |
-|---|---|
-| 1 | SCK |
-| 2 | MISO |
-| 3 | MOSI |
-| 4 | NSS (GPIO4) |
-| 5 | BUSY (GPIO9) |
-| 6 | DIO1 |
-| 7 | RESET |
+The IMU is deliberate: accelerometer data cross-validates acoustic
+tapping/banging detections. An impact signature and a sound signature together
+reduce false positives in a way an acoustic-only pipeline cannot.
 
 ---
 
 ## Hardware Summary
 
-| Component | Device | Board |
+All parts below are present in `Accoustic_Sensing_Node.kicad_sch`.
+
+| Function | Device | Ref |
 |---|---|---|
-| MCU (Compute) | ESP32-S3 | Board 1 |
-| MCU (ADC) | ESP32-C3 | Board 2 |
-| GNSS | u-blox MAX-M10S | Board 1 |
-| LoRa | SX1262 *(planned migration to certified module)* | Board 2 |
-| Mic Array | 4x analog microphones | Board 2 |
-| Flash | W25Q128JVSIQ (128 Mbit QSPI) | Board 1 |
-| Storage | MicroSD card | Board 1 |
-| USB | USB Type-C | Board 1 |
-| USB Protection | USBLC6-4SC6 | Board 1 |
-| Regulator | LM1117-3.3 | Board 1 |
+| Inference / acoustic front end | Sipeed M1 (Kendryte K210) | U9 |
+| Host MCU | ESP32-S3 (bare die, QFN56) | U8 |
+| Microphone array | 6× INMP441 I2S MEMS | U1, U2, U5, U6, U15, U16 |
+| LoRa transceiver | SX1262 | U3 |
+| GNSS receiver | u-blox MAX-M10S | U4 |
+| IMU | MPU-9250 (9-axis) | U10 |
+| External flash | W25Q128JVS (128 Mbit QSPI) | U7 |
+| USB hub | CH334F | CH334F1 |
+| USB-UART bridge (K210 ISP) | CP2102N | U11 |
+| USB ESD protection | USBLC6-4SC6 | U13 |
+| Buck regulator (5V → 3V3) | AP63203WU | U14 |
+| LDO (1V8) | LM1117MP-1.8 | U12 |
+| USB connector | USB Type-C receptacle | J3 |
+| Antenna connectors | Coaxial ×3 — GNSS, Wi-Fi, LoRa | J1, J2, J4 |
+
+---
+
+## Microphone Array
+
+Six INMP441 digital I2S MEMS microphones on **three data lines**, using the
+L/R tri-state pairing trick: each data line carries two mics, one strapped to the
+left slot and one to the right slot of the same stereo frame.
+
+| Data line | Left mic (L/R → GND) | Right mic (L/R → 3V3) |
+|---|---|---|
+| `SD_1` | U1 | U2 |
+| `SD_2` | U5 | U6 |
+| `SD_3` | U15 | U16 |
+
+All six share `SCK_MIC` (bit clock) and `WS` (word select), both driven by the
+K210 as I2S master. Because every microphone samples off the same bit clock, all
+six channels are **phase-coherent** — which is exactly what direction-of-arrival
+estimation requires, and the reason digital MEMS mics were chosen over an analog
+array behind a multiplexed ADC.
+
+This topology was breadboard-validated before being committed to the schematic.
+
+---
+
+## Inter-Processor Link — QSPI
+
+The K210 reports results to the ESP32-S3 over a 6-wire quad SPI bus, ESD-protected
+on every line (D15–D20).
+
+| Signal | ESP32-S3 | K210 |
+|---|---|---|
+| `QSPI_CLK` | GPIO37 | IO36 |
+| `QSPI_CS` | GPIO38 | IO37 |
+| `QSPI_D0` | GPIO33 | IO32 |
+| `QSPI_D1` | GPIO34 | IO33 |
+| `QSPI_D2` | GPIO35 | IO34 |
+| `QSPI_D3` | GPIO36 | IO35 |
+
+**No raw audio crosses this link.** The mic array feeds the K210 directly, so the
+bus carries only derived results — event class, confidence, and bearing.
 
 ---
 
@@ -132,18 +134,23 @@ Board 1 and Board 2 connect through a 21-pin castellated edge, grouped into thre
 
 ```text
 .
-├── PCB/
-│   ├── Board1_4Layer/
-│   └── Board2_2Layer/
-├── Libraries/
-│   └── DopplerDoA/
-├── Datasheets/
+├── Accoustic_Sensing_Node/     # KiCad 9 project (schematic + layout)
+├── Assets/
+│   ├── symbols/                # custom symbols (INMP441, Sipeed M1, SX1262, MAX-M10S)
+│   ├── footprints/
+│   └── 3dmodels/
+├── Open_Source_Design/         # reference designs consulted
+│   ├── Sipeed_M1/              # Maixduino schematic
+│   ├── USB_HUB/                # CH334F reference
+│   └── ESP_32_S3_2Layer/
 ├── Firmware/
-│   ├── Board1_S3/
-│   └── Board2_C3/
+│   ├── ESP32_S3/               # ESP-IDF — LoRa, GNSS, IMU, alert path
+│   └── K210/                   # standalone SDK — I2S capture, APU, inference
+├── Libraries/
+│   └── gray8/                  # spectrogram → BMP8 library (portable C99)
+├── Datasheets/
 ├── BOM/
 ├── README.md
-├── Future_Plan.md
 └── architecture.md
 ```
 
@@ -151,71 +158,87 @@ Board 1 and Board 2 connect through a 21-pin castellated edge, grouped into thre
 
 ## Project Status
 
-### Hardware — Board 1 (4-layer)
-- [x] System design
-- [x] Complete schematic
-- [x] Power supply
-- [x] USB-C interface
-- [x] ESP32-S3 integration
-- [x] GNSS integration
-- [x] External flash
-- [x] MicroSD interface
-- [x] Castellated edge connector (21-pin)
-- [ ] PCB layout
-- [ ] Design rule check
-- [ ] Fabrication
+### Schematic
 
-### Hardware — Board 2 (2-layer)
-- [x] ESP32-C3 integration
-- [x] LoRa (SX1262) integration
-- [ ] 4-mic array front-end schematic
-- [ ] Castellated edge connector (21-pin)
+- [x] Power tree — USB-C input, 2 A polyfuse, reverse-blocking, 5V → 3V3 buck
+- [x] ESP32-S3 core — crystal, decoupling, boot/reset, SPI flash
+- [x] USB — Type-C, ESD, CH334F hub, native-USB path to ESP32-S3
+- [x] Microphone array — 6× INMP441, L/R pairing, wired to K210
+- [x] K210 module — 5V and GND connected
+- [x] QSPI inter-processor link with ESD protection
+- [x] LoRa SPI control interface + antenna connector
+- [x] GNSS UART to host
+- [ ] Open electrical items — see errata below
+- [ ] ERC clean
+
+### Layout / Fabrication
+
 - [ ] PCB layout
-- [ ] RF optimization
+- [ ] RF sections — 50 Ω controlled impedance for LoRa and GNSS
 - [ ] Design rule check
 - [ ] Fabrication
 
 ### Firmware
-- [ ] ESP-IDF project scaffolding (S3 + C3)
-- [ ] Mic ADC driver (C3)
-- [ ] QSPI inter-board data link
-- [ ] LoRa driver (S3 → SX1262 over castellated edge)
+
+- [x] `gray8` spectrogram library — validated, portable across bare-metal and Linux targets
+- [ ] K210 I2S multi-channel capture (master, 3 data lines)
+- [ ] K210 APU beamforming / DoA bring-up
+- [ ] QSPI link — K210 master, ESP32-S3 SPI Slave HD
+- [ ] LoRa driver
 - [ ] GNSS driver
-- [ ] Storage drivers
-- [ ] Doppler DoA library (Stage 3)
-- [ ] Classification model integration (Stage 4)
+- [ ] IMU driver + acoustic/impact fusion
+- [ ] Event classifier
+
+---
+
+## Known Open Items (Errata)
+
+Tracked honestly — these are outstanding in the current schematic and must be
+closed before layout.
+
+| # | Item | Impact |
+|---|---|---|
+| 1 | K210 pins 53/54 (1V8 / 3V3 **outputs**) tied to rails already driven by U12 and U14 | **Dual-source conflict** — two regulators output-to-output |
+| 2 | No battery or charging block; `+5V` is USB-only | K210 cannot run untethered |
+| 3 | `RST` net shared between LoRa reset, K210 reset and CP2102N RTS | No independent reset control |
+| 4 | CP2102N TXD / RXD / DTR dangling | K210 cannot be flashed |
+| 5 | GNSS `RF_IN` (U4.11) unconnected — bias-T feeds VCC_RF only | No GNSS fix |
+| 6 | LoRa DIO2 / DIO3 driving status LEDs | DIO2 is RF-switch control, DIO3 is TCXO supply on most SX1262 modules |
+| 7 | LoRa `TX_EN` / `RX_EN` no-connect | External PA/LNA cannot be steered |
+| 8 | IMU I2C never reaches the ESP32-S3; `AD0` and `INT` floating | IMU unusable |
+| 9 | ~52 K210 pins without no-connect flags | ERC output unreadable |
+| 10 | GNSS UART nets still named `C+` / `C-` | Misleading; collides with USB naming |
 
 ---
 
 ## Applications
 
-* Wildlife / bioacoustic monitoring
-* Perimeter and intrusion detection
-* Search and rescue acoustic triangulation
-* Environmental noise source mapping
-* Remote sensor networks with human-presence detection
+**Primary:** search-and-rescue — locating survivors trapped under collapsed
+structures, where multiple nodes scattered across a site turn a large uncertain
+search area into a short list of places worth digging.
 
----
+**Secondary:**
 
-## Documentation
-
-Detailed hardware architecture, board interconnect signal mapping, firmware structure, and the DoA/classification pipeline are documented in **architecture.md**.
+- Perimeter and intrusion detection
+- Wildlife / bioacoustic monitoring
+- Environmental noise source mapping
+- Remote sensor networks with human-presence detection
 
 ---
 
 ## Roadmap
 
-* Finalize Board 2 mic array front-end
-* Migrate SX1262 to a certified LoRa module
-* Route and fabricate both boards
-* Validate castellated edge interconnect (signal integrity across QSPI + LoRa SPI)
-* Implement and benchmark Doppler DoA library
-* Train and deploy onboard classification model
-* Add battery charging and power monitoring
-* Add onboard debugging interface
+* Close the errata list and reach a clean ERC
+* Add battery charging, protection, and voltage monitoring
+* Add 5V boost + load switch so the K210 can be duty-cycled on battery
+* Migrate the SX1262 to a pre-certified LoRa module to simplify RF and compliance
+* Route and fabricate the board
+* Bring up K210 I2S capture and APU beamforming
+* Train and deploy the acoustic event classifier
+* Custom 3D-printed enclosure — acoustic ports, antenna clearance, drop survival
 
 ---
 
 ## License
 
-This project is currently under active development.
+Under active development.
