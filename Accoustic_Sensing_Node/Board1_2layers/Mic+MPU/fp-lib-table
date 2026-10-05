@@ -1,0 +1,5 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "Mic")(type "KiCad")(uri "${KIPRJMOD}/Mic.pretty")(options "")(descr ""))
+  (lib (name "Connectors")(type "KiCad")(uri "${KIPRJMOD}/Connectors.pretty")(options "")(descr ""))
+)

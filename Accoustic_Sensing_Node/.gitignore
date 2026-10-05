@@ -1,0 +1,38 @@
+# KiCad backups and temporary files
+*-backups/
+_autosave-*
+*.lck
+fp-info-cache
+*.kicad_prl
+*-bak
+*.bak
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+dist/
+*.spec
+
+# Firmware build output
+build/
+*.bin
+*.elf
+
+# Archives (zips are copies of folders we already upload)
+*.zip
+*.rar
+
+# Datasets, audio and cached ML data (too big for GitHub)
+INMP_441_Dataset/
+Public_Dataset/
+*.wav
+*.npz
+*.npy
+*.pkl
+*.joblib
+
+# Windows
+Thumbs.db
+desktop.ini
