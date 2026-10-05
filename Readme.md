@@ -12,9 +12,9 @@ is *where to dig*. Instead of sending people onto unstable rubble to listen, the
 node sends the ears in first.
 
 <p align="center">
-  <img src="images/board1_3d_top.png" width="45%" alt="Board 1 - microphone array, 3D render">
+  <img src="Accoustic_Sensing_Node/images/board1_3d_top.png" width="45%" alt="Board 1 - microphone array, 3D render">
   &nbsp;
-  <img src="images/board2_3d_top.png" width="45%" alt="Board 2 - main board, 3D render">
+  <img src="Accoustic_Sensing_Node/images/board2_3d_top.png" width="45%" alt="Board 2 - main board, 3D render">
   <br>
   <em>Left: Board 1, the 8-mic array (2-layer, Ø100 mm). Right: Board 2, the main board (4-layer, 50 × 75 mm).</em>
 </p>
@@ -118,11 +118,6 @@ The IMU is there on purpose. Tapping on rubble produces both a sound and a
 vibration. Requiring both reduces false alarms in a way an acoustic-only system
 cannot.
 
-<p align="center">
-  <img src="images/stack_3d.png" width="60%" alt="Both boards joined at the castellated edge">
-  <br><em>Both boards joined at the castellated edge.</em>
-</p>
-
 ---
 
 ## Why two boards
@@ -197,14 +192,14 @@ high-speed bus.
 > The `Mic+MPU` folder name is historical. The MPU-9250 is on Board 2.
 
 <p align="center">
-  <img src="images/board1_3d_top.png" width="45%" alt="Board 1 top">
+  <img src="Accoustic_Sensing_Node/images/board1_3d_top.png" width="45%" alt="Board 1 top">
   &nbsp;
-  <img src="images/board1_3d_bottom.png" width="45%" alt="Board 1 bottom, mic ports">
+  <img src="Accoustic_Sensing_Node/images/board1_3d_bottom.png" width="45%" alt="Board 1 bottom, mic ports">
   <br><em>Board 1, top and bottom. The microphone sound holes are on the bottom face.</em>
 </p>
 
 <p align="center">
-  <img src="images/board1_layout.png" width="70%" alt="Board 1 PCB layout">
+  <img src="Accoustic_Sensing_Node/images/board1_layout.png" width="70%" alt="Board 1 PCB layout">
   <br><em>Board 1 layout in KiCad.</em>
 </p>
 
@@ -229,18 +224,16 @@ high-speed bus.
 Stack-up: GND on F.Cu, In1.Cu and B.Cu; +3V3 on In2.Cu.
 
 <p align="center">
-  <img src="images/board2_3d_top.png" width="45%" alt="Board 2 top">
+  <img src="Accoustic_Sensing_Node/images/board2_3d_top.png" width="45%" alt="Board 2 top">
   &nbsp;
-  <img src="images/board2_3d_bottom.png" width="45%" alt="Board 2 bottom">
+  <img src="Accoustic_Sensing_Node/images/board2_3d_bottom.png" width="45%" alt="Board 2 bottom">
   <br><em>Board 2, top and bottom.</em>
 </p>
 
 <p align="center">
-  <img src="images/board2_layout.png" width="70%" alt="Board 2 PCB layout">
+  <img src="Accoustic_Sensing_Node/images/board2_layout.png" width="70%" alt="Board 2 PCB layout">
   <br><em>Board 2 layout in KiCad.</em>
 </p>
-
-Schematics (PDF): [Board 1](images/board1_schematic.pdf) · [Board 2](images/board2_schematic.pdf)
 
 ---
 
@@ -433,7 +426,7 @@ K210 as a single dot product.
 | `voice_band_ratio` | Share of energy in 300–3400 Hz (512-point Hann-window FFTs) |
 | `snr_db` | Level above a rolling noise floor (20th percentile over the last 8 s) |
 
-- Trained in Python (`ML/`). The feature scaler is folded into the weights and
+- Trained in Python (`Accoustic_Sensing_Node/ML/`). The feature scaler is folded into the weights and
   exported as `vad3_model.h`, so the chip does no extra scaling.
 - Decision threshold (logit) **2.389**, then smoothed over **3** consecutive
   decisions (`VAD_SMOOTH_K = 3`).
@@ -498,10 +491,8 @@ It uses a threaded server with HTTP/1.1 keep-alive, which fixed the lag we saw
 on phones over a hotspot.
 
 <p align="center">
-  <img src="images/dashboard.png" width="45%" alt="Live dashboard">
-  &nbsp;
-  <img src="images/gui.png" width="45%" alt="Desktop GUI">
-  <br><em>Left: live dashboard (browser). Right: desktop GUI.</em>
+  <img src="Accoustic_Sensing_Node/images/dashboard.png" width="70%" alt="Live dashboard">
+  <br><em>Live dashboard in the browser.</em>
 </p>
 
 ---
@@ -512,10 +503,12 @@ Before the PCBs, the full pipeline was built on a breadboard: a Sipeed Maix
 board with **4 INMP441 mics in a 40 mm square**. Opposite corners are paired, so
 the baseline is the square's diagonal, **56.6 mm**.
 
+<!-- Add the photo later: save it as Accoustic_Sensing_Node/images/prototype_breadboard.jpg and delete these comment markers
 <p align="center">
-  <img src="images/prototype_breadboard.jpg" width="60%" alt="Breadboard prototype">
+  <img src="Accoustic_Sensing_Node/images/prototype_breadboard.jpg" width="60%" alt="Breadboard prototype">
   <br><em>Breadboard prototype: Maix board + 4 INMP441 in a 40 mm square.</em>
 </p>
+-->
 
 What works on the prototype:
 
@@ -587,9 +580,11 @@ representative of the final board, so they are not published here.
 
 ## Repository layout
 
+Everything for the acoustic node lives in the `Accoustic_Sensing_Node/` folder:
+
 ```text
 Accoustic_Sensing_Node/
-├── README.md                     ← this file
+├── README.md                     ← copy of this file
 ├── images/                       ← all pictures used in this README
 │
 ├── Board1_2layers/
@@ -628,6 +623,12 @@ because of their size.
 ---
 
 ## Getting started
+
+Run everything from inside the acoustic folder:
+
+```bash
+cd Accoustic_Sensing_Node
+```
 
 ### 1. Python tools
 
