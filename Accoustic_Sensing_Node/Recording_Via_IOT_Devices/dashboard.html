@@ -1,0 +1,155 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Acoustic Survivor Detection</title>
+<style>
+  :root{--bg:#0b0e13;--panel:#141922;--line:#232b38;--txt:#e6e9ef;--mut:#7c8798;
+        --human:#4ade80;--other:#60a5fa;--warn:#fbbf24;--bad:#f87171}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+       font:14px/1.5 "Segoe UI",system-ui,sans-serif;display:flex;height:100vh}
+  #left{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+  #side{width:300px;background:var(--panel);border-left:1px solid var(--line);
+        padding:20px;overflow:auto}
+  h1{font-size:17px;margin:0 0 4px}
+  .sub{color:var(--mut);font-size:12px;margin-bottom:18px}
+  .row{display:flex;justify-content:space-between;padding:6px 0;
+       border-bottom:1px solid var(--line);font-size:13px}
+  .row span:last-child{font-family:Consolas,monospace}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+  .k{color:var(--mut)}
+  #diag{margin-top:14px;padding:10px;border-radius:6px;font-size:12px;
+        background:#3a2118;border:1px solid #6b3a24;color:var(--warn);display:none}
+  #log{margin-top:16px;font:11px/1.45 Consolas,monospace;color:var(--mut);
+       max-height:150px;overflow:auto;white-space:pre-wrap}
+  .legend{margin-top:18px;font-size:12px;color:var(--mut)}
+  .legend div{margin:5px 0}
+</style>
+<div id="left"><canvas id="c" width="620" height="620"></canvas></div>
+<div id="side">
+  <h1>Acoustic Survivor Detection</h1>
+  <div class="sub">K210 · 4 × INMP441 · 40 mm array</div>
+  <div class="row"><span class="k">Link</span><span id="link">—</span></div>
+  <div class="row"><span class="k">Bearing</span><span id="ang">—</span></div>
+  <div class="row"><span class="k">Class</span><span id="cls">—</span></div>
+  <div class="row"><span class="k">VAD score</span><span id="scr">—</span></div>
+  <div class="row"><span class="k">Level</span><span id="lvl">—</span></div>
+  <div class="row"><span class="k">DOA conf.</span><span id="cnf">—</span></div>
+  <div class="row"><span class="k">lag x / y</span><span id="lag">—</span></div>
+  <div class="row"><span class="k">Packets</span><span id="pkt">—</span></div>
+  <div class="row"><span class="k">Audio frames</span><span id="aud">—</span></div>
+  <div class="row"><span class="k">Dropped</span><span id="drp">—</span></div>
+  <div id="diag"></div>
+  <div style="margin-top:14px">
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mut)">
+      <span>Human threshold</span><span id="thv">2.39</span>
+    </div>
+    <input id="th" type="range" min="-8" max="8" step="0.1" value="2.39"
+           style="width:100%;margin-top:6px">
+    <div style="font-size:11px;color:var(--mut);margin-top:2px">
+      drag while talking - green above, blue below
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="dot" style="background:var(--human)"></span>human voice</div>
+    <div><span class="dot" style="background:var(--other)"></span>other sound</div>
+    <div>circle size = amplitude</div>
+    <div>circles fade over 12 s</div>
+  </div>
+  <div id="log"></div>
+</div>
+<script>
+const cv=document.getElementById('c'), cx=cv.getContext('2d');
+const CX=310, CY=310, R=250, FADE=12;   // seconds a detection stays visible
+let dets=[], st={};
+
+function ring(){
+  cx.clearRect(0,0,620,620);
+  // range rings
+  cx.strokeStyle='#1d2531'; cx.lineWidth=1;
+  for(let i=1;i<=4;i++){cx.beginPath();cx.arc(CX,CY,R*i/4,0,7);cx.stroke();}
+  // spokes + compass
+  cx.font='12px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+  const lab={0:'E',45:'NE',90:'N',135:'NW',180:'W',225:'SW',270:'S',315:'SE'};
+  for(let a=0;a<360;a+=45){
+    const r=a*Math.PI/180;
+    cx.strokeStyle=(a%90===0)?'#2b3543':'#1d2531';
+    cx.beginPath(); cx.moveTo(CX,CY);
+    cx.lineTo(CX+R*Math.cos(-r),CY+R*Math.sin(-r)); cx.stroke();
+    cx.fillStyle='#7c8798';
+    cx.fillText(lab[a],CX+(R+18)*Math.cos(-r),CY+(R+18)*Math.sin(-r));
+  }
+  // node at centre
+  cx.fillStyle='#2b3543'; cx.beginPath(); cx.arc(CX,CY,7,0,7); cx.fill();
+}
+
+function draw(){
+  ring();
+  const now=Date.now()/1000;
+  for(const d of dets){
+    const age=d.age!==undefined?d.age:(now-d.t);
+    if(age>FADE) continue;
+    const fade=1-age/FADE;
+    // Radius carries AGE, not distance - a single array cannot measure
+    // range. Newest sits near the rim, older drifts inward as it fades.
+    const rad=R*(0.30+0.62*fade);
+    const th=-d.angle*Math.PI/180;
+    const x=CX+rad*Math.cos(th), y=CY+rad*Math.sin(th);
+    const size=6+26*d.amplitude;
+    const col=d.klass==='human'?'74,222,128':'96,165,250';
+    cx.fillStyle=`rgba(${col},${0.13*fade})`;
+    cx.beginPath(); cx.arc(x,y,size,0,7); cx.fill();
+    cx.strokeStyle=`rgba(${col},${0.85*fade})`; cx.lineWidth=2;
+    cx.beginPath(); cx.arc(x,y,size,0,7); cx.stroke();
+    if(d.klass==='human'&&fade>0.55){
+      cx.strokeStyle=`rgba(${col},${0.30*fade})`; cx.lineWidth=1;
+      cx.beginPath(); cx.moveTo(CX,CY); cx.lineTo(x,y); cx.stroke();
+    }
+  }
+  // live bearing ray
+  if(st.angle!==null&&st.angle!==undefined&&st.warm){
+    const th=-st.angle*Math.PI/180;
+    cx.strokeStyle=st.speech?'#4ade80':'#3a4553'; cx.lineWidth=2;
+    cx.beginPath(); cx.moveTo(CX,CY);
+    cx.lineTo(CX+R*Math.cos(th),CY+R*Math.sin(th)); cx.stroke();
+  }
+}
+
+const el=id=>document.getElementById(id);
+async function poll(){
+  try{
+    const [a,b]=await Promise.all([
+      fetch('/api/detections').then(r=>r.json()),
+      fetch('/api/state').then(r=>r.json())]);
+    dets=a.detections; st=b;
+    const live=st.connected;
+    el('link').innerHTML=`<span class="dot" style="background:${live?'var(--human)':'var(--bad)'}"></span>`+
+      (live?(st.warm?'live':'warming up'):'no device');
+    el('ang').textContent=st.angle==null?'—':st.angle.toFixed(1)+'°';
+    el('cls').textContent=st.speech?'HUMAN':'—';
+    el('cls').style.color=st.speech?'var(--human)':'var(--mut)';
+    el('scr').textContent=(st.score??0).toFixed(2);
+    el('lvl').textContent=(st.level_db??0).toFixed(1)+' dB';
+    el('cnf').textContent=(st.confidence??0).toFixed(2);
+    el('cnf').style.color=(st.confidence<0)?'var(--bad)':'var(--txt)';
+    el('lag').textContent=((st.lag_x??0).toFixed(2))+' / '+((st.lag_y??0).toFixed(2));
+    el('pkt').textContent=st.packets??0;
+    el('drp').textContent=st.dropped??0;
+    el('drp').style.color=(st.dropped>0)?'var(--bad)':'var(--txt)';
+    el('aud').textContent=st.audio_frames??0;
+    const dg=el('diag'), msg=st.diagnosis||'';
+    if(msg && msg!=='ok'){dg.style.display='block'; dg.textContent=msg;}
+    else dg.style.display='none';
+    el('log').textContent=(st.device_lines||[]).join('\n');
+  }catch(e){
+    el('link').innerHTML='<span class="dot" style="background:var(--bad)"></span>server down';
+  }
+}
+const th=el('th');
+th.addEventListener('input',()=>{
+  el('thv').textContent=(+th.value).toFixed(2);
+  fetch('/api/threshold?v='+th.value);
+});
+setInterval(poll,250);
+setInterval(draw,50);
+poll(); draw();
+</script>
